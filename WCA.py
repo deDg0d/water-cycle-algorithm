@@ -40,16 +40,17 @@ subsystems = 14
 LB_typePeice = 1
 UB_typePeice = 4
 LB_numberPeice = 1
-UB_numberPeice = 6
+UB_numberPeice = 4
 #--------------------------------------------------------code variables-------------------------------------------------------------------------------------------------------------------------------------------------------
 rainDrops = []
+bestFitInitialy = 0
 #--------------------------------------------------------parameters-------------------------------------------------------------------------------------------------------------------------------------------------------------
 nRivers = 2
 nsr = nRivers+1
 n_pop = 1
-dmax = 1e-16
-max_it = 2
-rainRate = 1000
+dmax = 0.2
+max_it = 1
+rainRate = 200
 #/////////////////////////////////////////////////////////////////////functions\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 #--------------------------------------------------------(produce solution)------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def create_rainDrops(number=1): #create new rainDrop
@@ -91,24 +92,58 @@ def fitness(rainDrop):
             k+=1
         reliabilityTotal.append(np.prod(reliabilityForEach)-(alfa*penalty1)-(beta*penalty2))
     return (reliabilityTotal)
-#--------------------------------------------------------(changing position(crossover))------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 #--------------------------------------------------------(evaporation(mutation))------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    
-#--------------------------------------------------------(intesnsity of flow)------------------------------------------------------------------------------------------------------------------------------------------------------------------
-def intesnsityOfFlow(fit):
-    nsn = []
-    for i in range(len(fit)):
-        nsn.append(math.ceil((fit[i]/sum(fit)*n_pop)))
-    return (nsn)
-#--------------------------------------------------------(rain)--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+def evaporation():
+
+    pass
+#--------------------------------------------------------(changing position stream and sea related to sea(crossover))------------------------------------------------------------------------------------------------------------------------------------------------------------------
+def changePositionSea(sea, streamRiver):
+    evaporation = False
+    #streamRiver[number][][0=peice1=number][element]
+    #sea[0][0=peice1=number][element]
+    newStreamFit = []
+    seaFit = fitness(sea)
+    for i in range(len(streamRiver)):
+        rand = np.random.choice(np.arange(1,subsystems))
+        for j in range(rand):
+            streamRiver[i][0][0][j] = sea[0][0][j]  #randth first element from sea #peice
+            streamRiver[i][0][1][j] = sea[0][1][j]  #randth first element from sea #number
+    for i in range(len(streamRiver)):
+        newStreamFit.append(fitness(streamRiver[i]))
+        if newStreamFit[i] >seaFit:
+            sea , streamRiver[i] = streamRiver[i] , sea
+    if len(streamRiver) == nRivers:#if it was river not stream
+        for j in range(len(streamRiver)):
+            if abs(seaFit[0] - newStreamFit[j][0])<dmax:
+                evaporation = True # rainning process
+                    # print('bezan baran baharan fasle khun ast')
+    # print(f'sea in crossover {sea}')
+    return sea , streamRiver, evaporation
+#--------------------------------------------------------(intesnsity of flow),modification of nsn------------------------------------------------------------------------------------------------------------------------------------------------------------------
+def intesnsityOfFlow(cs,n_pop):
+    cn = cs - min(cs)
+    ns = []
+    for i in range(len(cn)):
+        ns.append(round((cn[i]/sum(cn)*(n_pop-nsr)))) #*number of streams
+    nStream = n_pop-nsr
+    while sum(ns)>nStream:
+        ns = [i-1 for i in ns]
+    while sum(ns)<nStream:
+        ns = [i+1 for i in ns]
+    if 0 in ns:
+        index = ns.index(0)
+        while ns[index]==0:
+            ns[index]+=round(ns[0]/6)
+            ns[0]-=round(ns[0]/6)
+    return (ns)
+#--------------------------------------------------------------(rain)--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def rain():
     initial_rain = []
     toSortFitness = []
     sortedRain = []
     for _ in range(rainRate):
         d = create_rainDrops()
-        if fitness(d)[0] > 0:
+        if fitness(d)[0] > 0.4:
             initial_rain.append(d)
             toSortFitness.append(fitness(d)[0])
     n_pop = len(initial_rain)
@@ -117,12 +152,25 @@ def rain():
     for idx in sortedFitness:
         sortedRain.append(initial_rain[idx])
     toSortFitness = np.sort(toSortFitness)[::-1]
-    nsn = intesnsityOfFlow(toSortFitness[:nsr])#calculating intensity of flow
-    return sortedRain , nsn
+    nsn = intesnsityOfFlow(toSortFitness[:nRivers+2],n_pop)#calculating intensity of flow
+    return sortedRain , toSortFitness , nsn
 #--------------------------------------------------------initializing------------------------------------------------------------------------------------------------------------------------------------------------------------------
-rainDrops, nsn = rain()
-print(rainDrops)
+rainDrops ,fit ,ns = rain()
+bestFitInitialy = fit[0]
+sea = rainDrops[0]
+seaFit = fit[0]
+rivers = rainDrops[1:nRivers+1]
+riverFit = fit[1:nRivers+1]
+stream = rainDrops[nRivers+1:] 
+streamFit = fit[nRivers+1:]
 #--------------------------------------------------------Main loop-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 for i in range(max_it):
-    pass
+    # print(f' sea in main {sea}')
+    sea , stream, evaporation = changePositionSea(sea, stream ) #move streams toward sea #ns[0] is number of streams
+    sea , rivers, evaporation = changePositionSea(sea, rivers ) #move rivers toward sea #ns[0] is number of streams
+    print(f' iteration{i} sea {fitness(sea)} best initial point is {bestFitInitialy}') #run status
+    if evaporation == True:
+        stream, streamFit, additional= rain() #rainning process
+
+# print(ns,len(stream))
 
