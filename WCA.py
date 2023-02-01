@@ -1,15 +1,13 @@
 #danial ramezani
 #water cycle algorithm python code for ROP problem
-
 import numpy as np
-import matplotlib.pyplot
+import matplotlib.pyplot as plt
 import random
 import math
 import time
 t=time.time()
 time.time()-t
 #--------------------------------------------------------problem data----------------------------------------------------------------------------------
-
 lambdaValue=[[0],
 [0.00532 ,0.00818 ,0.0133 ,0.00741 ,0.00619, 0.00436 ,0.0105, 0.015, 0.00268, 0.0141, 0.00394, 0.00236, 0.00215, 0.011],
 [0.000726 ,0.000619, 0.011, 0.0124, 0.00431, 0.00567, 0.00466, 0.00105, 0.000101, 0.00683, 0.00355, 0.00769, 0.00436, 0.00834],
@@ -44,20 +42,21 @@ UB_numberPeice = 4
 #--------------------------------------------------------code variables-------------------------------------------------------------------------------------------------------------------------------------------------------
 rainDrops = []
 bestFitInitialy = 0
+all_best_fitness = []
 #--------------------------------------------------------parameters-------------------------------------------------------------------------------------------------------------------------------------------------------------
 nRivers = 2
 nsr = nRivers+1
 n_pop = 1
-dmax = 0.2
-max_it = 1
-rainRate = 200
+dmax = 0.01
+max_it = 500
+rainRate = 1000
 #/////////////////////////////////////////////////////////////////////functions\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 #--------------------------------------------------------(produce solution)------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def create_rainDrops(number=1): #create new rainDrop
     new_solutions = []
     for _ in range(number):
         for _ in range(subsystems):#type
-            new_solutions.append(random.choice(np.arange(LB_typePeice,UB_typePeice)))
+            new_solutions.append(random.choice(np.arange(LB_typePeice,UB_typePeice+1)))
         for _ in range(subsystems):#number
             new_solutions.append(random.choice(np.arange(LB_numberPeice,UB_numberPeice)))
     new_solutions = np.array(new_solutions)
@@ -92,11 +91,7 @@ def fitness(rainDrop):
             k+=1
         reliabilityTotal.append(np.prod(reliabilityForEach)-(alfa*penalty1)-(beta*penalty2))
     return (reliabilityTotal)
-#--------------------------------------------------------(evaporation(mutation))------------------------------------------------------------------------------------------------------------------------------------------------------------------
-def evaporation():
-
-    pass
-#--------------------------------------------------------(changing position stream and sea related to sea(crossover))------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------(changing position stream and rivers related to sea(crossover))------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def changePositionSea(sea, streamRiver):
     evaporation = False
     #streamRiver[number][][0=peice1=number][element]
@@ -116,9 +111,29 @@ def changePositionSea(sea, streamRiver):
         for j in range(len(streamRiver)):
             if abs(seaFit[0] - newStreamFit[j][0])<dmax:
                 evaporation = True # rainning process
-                    # print('bezan baran baharan fasle khun ast')
-    # print(f'sea in crossover {sea}')
     return sea , streamRiver, evaporation
+#--------------------------------------------------------------(changing position stream related to rivers(crossover))--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+def change_position_river_stream(river,stream,ns):
+    ns = ns[1:nRivers+1]
+    newStreamFit = []
+    random_j = []
+    for i in range(nRivers): #change pos related to river i
+        for _ in range(ns[i]): #change pos of ns[i]th stream related to river i
+            rand = np.random.choice(np.arange(1,subsystems))
+            j = np.random.choice(np.arange(1,len(stream))) #pick random stream to change position related to river 1
+            random_j.append(j)
+            for k in range(rand):
+                stream[j][0][0][k] = rivers[i][0][0][k]
+                stream[j][0][1][k] = rivers[i][0][1][k]
+    k=0 #to compare new streams fitness versus river
+    for i in range(len(river)): #compare all streams' fit with river ith
+        for j in random_j:
+            newStreamFit.append(fitness(stream[j]))
+            if newStreamFit[k]>fitness(river[i]):
+                stream[j] , river[i] = river[i] , stream[j]
+            k+=1
+    return stream, river
+    
 #--------------------------------------------------------(intesnsity of flow),modification of nsn------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def intesnsityOfFlow(cs,n_pop):
     cn = cs - min(cs)
@@ -136,14 +151,19 @@ def intesnsityOfFlow(cs,n_pop):
             ns[index]+=round(ns[0]/6)
             ns[0]-=round(ns[0]/6)
     return (ns)
-#--------------------------------------------------------------(rain)--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------(changing dmax value)--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+def change_dmax():
+    new_dmax = dmax - dmax/max_it
+    return new_dmax
+#--------------------------------------------------------------(rain,evaporation(mutation))--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def rain():
+    print('rain')
     initial_rain = []
     toSortFitness = []
     sortedRain = []
     for _ in range(rainRate):
         d = create_rainDrops()
-        if fitness(d)[0] > 0.4:
+        if fitness(d)[0] > 0.5:
             initial_rain.append(d)
             toSortFitness.append(fitness(d)[0])
     n_pop = len(initial_rain)
@@ -165,12 +185,18 @@ stream = rainDrops[nRivers+1:]
 streamFit = fit[nRivers+1:]
 #--------------------------------------------------------Main loop-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 for i in range(max_it):
-    # print(f' sea in main {sea}')
     sea , stream, evaporation = changePositionSea(sea, stream ) #move streams toward sea #ns[0] is number of streams
     sea , rivers, evaporation = changePositionSea(sea, rivers ) #move rivers toward sea #ns[0] is number of streams
-    print(f' iteration{i} sea {fitness(sea)} best initial point is {bestFitInitialy}') #run status
-    if evaporation == True:
-        stream, streamFit, additional= rain() #rainning process
+    stream , rivers = change_position_river_stream(rivers,stream,ns) #move streams toward rivers
+    if evaporation == True: #check for evaporation condition
+        stream, streamFit, ns= rain() #rainning process
+    seaFit = fitness(sea)
+    print(f' iteration {i} sea {seaFit} best initial point is {bestFitInitialy} dmax {dmax}  max find in ran{max(streamFit)}') #run status
+    all_best_fitness.append(seaFit[0])
+    dmax = change_dmax()#changing dmax value
 
-# print(ns,len(stream))
+#--------------------------------------------------------Main loop-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+iteration = [i for i in range(max_it)]
+plt.plot(iteration,all_best_fitness)
+plt.show()
 
